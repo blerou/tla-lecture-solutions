@@ -1,6 +1,6 @@
 -------------------------- MODULE MyTwoPhaseCommit --------------------------
 
-CONSTANTS RM
+CONSTANT RM
 
 VARIABLES rmState, tmState, tmPrepared, msgs
 
@@ -8,9 +8,9 @@ Messages == [type: {"Prepared"}, rm: RM] \union [type: {"Commit", "Abort"}]
 
 TPTypeOK == 
   /\ rmState \in [RM |-> {"working", "prepared", "committed", "aborted"}]
-  /\ tmState \in { "init", "done" }
+  /\ tmState \in { "init", "committed", "aborted" }
   /\ tmPrepared \subseteq RM
-  /\ msgs \in Messages
+  /\ msgs \subseteq Messages
   
 TPInit ==
   /\ rmState = [ r \in RM |-> "working" ]
@@ -27,15 +27,15 @@ TMRcvPrepared(r) ==
 TMCommit ==
   /\ tmState = "init"
   /\ tmPrepared = RM
-  /\ msgs' = msgs \union [type |-> "Commit"]
-  /\ tmState' = "done"
+  /\ tmState' = "committed"
+  /\ msgs' = msgs \union {[type |-> "Commit"]}
   /\ UNCHANGED << rmState, tmPrepared >>
   
 TMAbort ==
   /\ tmState = "init"
 \*  /\ \E r \in RM: rmState[r] = "aborted"
-  /\ msgs' = msgs \union [type |-> "Abort"]
-  /\ tmState' = "done"
+  /\ tmState' = "aborted"
+  /\ msgs' = msgs \union {[type |-> "Abort"]}
   /\ UNCHANGED << rmState, tmPrepared >>
 
 RMPrepared(r) ==
@@ -50,29 +50,25 @@ RMChooseToAbort(r) ==
   /\ UNCHANGED << tmState, tmPrepared, msgs >>
 
 RMRcvCommitMsg(r) ==
-  /\ rmState[r] = "prepared"
+\*  /\ rmState[r] = "prepared"
   /\ [type |-> "Commit"] \in msgs
   /\ rmState' = [rmState EXCEPT ![r] = "commited"]
   /\ UNCHANGED << tmState, tmPrepared, msgs >>
  
 RMRcvAbortMsg(r) ==
-  /\ rmState[r] = {"working", "prepared"}
+\*  /\ rmState[r] = {"working", "prepared"}
   /\ [type |-> "Abort"] \in msgs
   /\ rmState' = [rmState EXCEPT ![r] = "aborted"]
   /\ UNCHANGED << tmState, tmPrepared, msgs >>
  
 TPNext == 
-  \/ TMCommit
-  \/ TMAbort
+  TMCommit \/ TMAbort
   \/ \E r \in RM: 
-      \/ TMRcvPrepared(r) 
-      \/ RMPrepared(r)
-      \/ RMChooseToAbort(r)
-      \/ RMRcvCommitMsg(r)
-      \/ RMRcvAbortMsg(r) 
+    TMRcvPrepared(r) \/ RMPrepared(r) \/ RMChooseToAbort(r)
+      \/ RMRcvCommitMsg(r) \/ RMRcvAbortMsg(r) 
 
 
 =============================================================================
 \* Modification History
-\* Last modified Thu Jan 18 22:13:56 CET 2024 by szsulik
+\* Last modified Thu Jan 18 22:24:45 CET 2024 by szsulik
 \* Created Thu Jan 18 21:32:59 CET 2024 by szsulik
